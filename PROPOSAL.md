@@ -89,7 +89,7 @@ Large modules and full repos are too big for individual SFT samples. Instead, we
    - Module-level units only when necessary (e.g., shared View functions).
 
 4. **JSONL Serialization (Text-Only)**
-   Each dataset entry is stored as a text-only example, e.g.:
+  Each dataset entry is stored as a text-only example, e.g.:
 
    ```json
    {
@@ -107,10 +107,14 @@ Large modules and full repos are too big for individual SFT samples. Instead, we
    ```
 
 5. **Quality Filtering & Deduplication**
-   - Remove trivial/uninteresting samples.
-   - Deduplicate near-duplicates across repositories.
+  - Remove trivial/uninteresting samples.
+  - Deduplicate near-duplicates across repositories.
 
-This yields a dataset that is small, focused, and tailored for SFT.
+**Two complementary products from the minimizer.**
+- **SFT dataset (Q/A style, no reasoning):** every minimized snippet is converted into question/answer pairs for Tasks A/B/C. The "question" is the task-specific prompt (e.g., "add the missing `requires`"), and the "answer" is the ground-truth spec or code. We deliberately keep the answers *reasoning-free* so that SFT teaches the model crisp completions without hallucinated thought chains.
+- **RL trajectory dataset (reasoning-rich):** for the exact same minimized examples, we also log multi-step interaction traces (tool calls, intermediate hypotheses, Verus logs). These richer transcripts fuel offline RL algorithms by giving them access to explicit reasoning steps, not just final Q/A endpoints.
+
+This yields datasets that are small, focused, and tailored separately for high-quality SFT and reasoning-aware RL.
 
 ### Phase 1: Text-Only SFT Tasks
 
@@ -410,9 +414,9 @@ This prompt-only RL approach enhances VeriStruct by (1) enabling deliberate tool
 
 ### 4. Prioritizing Offline RL Before Online RL
 
-Given Verus’s relatively high evaluation cost, we plan to **start with offline RL** and use it to de-risk later online experiments:
+Given Verus’s relatively high evaluation cost, we plan to **start with offline RL** and use it to de-risk later online experiments. The same minimizer-powered corpus that feeds SFT also seeds the RL logs: for each minimized instance we first store the clean Q/A pair for SFT, then capture the richer reasoning trajectories (tool calls, intermediate hypotheses, Verus transcripts) that offline RL needs. This ensures we are "offline-first" by construction—every RL policy sees only previously logged data until we explicitly green-light online exploration.
 
-1. **Log every VeriStruct/Verus interaction now.** While running SFT evaluations or the prompt-based agent, persist full transcripts (code snapshots, tool calls, Verus logs). This becomes the seed offline dataset.
+1. **Log every VeriStruct/Verus interaction now.** While running SFT evaluations or the prompt-based agent on minimizer-derived tasks, persist full transcripts (code snapshots, tool calls, Verus logs). This becomes the seed offline dataset that already aligns with the Q/A samples used for SFT.
 2. **Label and filter trajectories offline.** Add success/failure flags, VC deltas, and metadata such as module size or error category. Remove degenerate runs to keep the distribution clean.
 3. **Train offline policies.** Use Decision Transformers or conservative Q-learning variants to learn policies that predict next edits/specs conditioned on the logged context. Because training is offline, we can iterate rapidly without burning Verus cycles.
 4. **Validate offline.** Roll out the learned policies in a simulator harness that replays logged states before attempting any fresh Verus calls. Ensure they do not overfit to logging artifacts.
