@@ -101,6 +101,7 @@ Possible sources of additional Verus examples include:
 - [Verismo](https://github.com/microsoft/verismo) for verified systems examples
 - [Verified Memory Allocator](https://github.com/verus-lang/verified-memory-allocator) for memory-safety focused code
 - [Verified Storage](https://github.com/microsoft/verified-storage) for storage system verification examples
+- [Vericoding](https://github.com/Beneficial-AI-Foundation/vericoding) for related work and potential benchmarking ideas
 
 ## File Structure
 
