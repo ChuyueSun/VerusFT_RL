@@ -578,7 +578,7 @@ VerusFT-RL/
     └── tokenizer files
 ```
 
-## Future Improvements
+## Future improvements
 
 1. **Expand dataset**: Add 50–100+ diverse Verus examples.
 2. **Better base model**: Try code-specific models such as `Qwen/Qwen2.5-Coder-1.5B`, `bigcode/starcoder2-3b`, or `deepseek-ai/deepseek-coder-1.3b-base`.
