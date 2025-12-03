@@ -8,20 +8,23 @@ VerusSFT is a research repository for exploring **supervised fine-tuning (SFT)**
 ## Table of Contents
 - [Quick Start](#quick-start)
 - [Project Status](#project-status)
+- [Known Limitations](#known-limitations)
 - [Project Goals](#project-goals)
+- [Getting Started for Contributors](#getting-started-for-contributors)
 - [Motivation](#motivation)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Dataset](#dataset)
-- [File Structure](#file-structure)
+- [Related Work](#related-work)
 - [Methodology](#methodology)
 - [Reinforcement Learning Extensions](#reinforcement-learning-extensions-for-verification-agents)
 - [Student Subprojects](#student-subprojects)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Compute Requirements](#compute-requirements)
+- [Dataset](#dataset)
+- [File Structure](#file-structure)
 - [FAQ](#faq)
 - [Troubleshooting](#troubleshooting)
 - [Future Improvements](#future-improvements)
-- [Related Work](#related-work)
 - [Contributing](#contributing)
 - [Citation](#citation)
 - [License](#license)
@@ -120,6 +123,66 @@ python test_inference.py
 - After strong text-only baselines, introduce AST/structured encodings
 - Measure incremental benefit via ablation studies
 - Answer: *For what types of verification tasks do ASTs provide value beyond plain text?*
+
+---
+
+## Getting Started for Contributors
+
+Welcome! This section helps you get started whether you're a student, researcher, or open-source contributor.
+
+### For First-Time Contributors
+
+**Quickstart path** (15 minutes):
+1. Read [Motivation](#motivation) to understand the problem
+2. Try the prototype: `python sft_example.py` (validates setup)
+3. Review [Student Subprojects](#student-subprojects) to find a task
+4. Check GitHub issues for `good-first-issue` labels
+
+**What to read**:
+- **Minimum**: [Project Goals](#project-goals), [Known Limitations](#known-limitations)
+- **For dataset work**: [Methodology > Dataset Pipeline](#dataset-pipeline)
+- **For training work**: [Configuration](#configuration), [Compute Requirements](#compute-requirements)
+- **For evaluation**: [Phase 1: Evaluation](#phase-1-evaluation)
+
+### For Researchers
+
+**Deep dive path**:
+1. Read the full [Methodology](#methodology) section
+2. Study [Reinforcement Learning Extensions](#reinforcement-learning-extensions-for-verification-agents)
+3. Review [Related Work](#related-work) and cited papers
+4. Examine [Future Improvements](#future-improvements) for open problems
+
+**Key research questions**:
+- How much does Verus-specific fine-tuning improve over general code models?
+- What verification tasks benefit most from multi-task training?
+- When do structured representations (ASTs) provide value over text?
+- How can offline RL leverage Verus minimizer outputs?
+
+### For Students (Rotation/Undergrad Projects)
+
+See [Student Subprojects](#student-subprojects) for scoped projects. Each includes:
+- Difficulty level (Easy/Medium/Hard)
+- Current status
+- Clear deliverables
+
+**Recommended progression**:
+1. **Week 1-2**: Set up environment, run prototype, read methodology
+2. **Week 3-4**: Choose subproject, implement minimal version
+3. **Week 5-8**: Expand implementation, collect results
+4. **Week 9-10**: Evaluation, documentation, presentation
+
+### How to Contribute
+
+1. **Start a discussion**: Open a GitHub issue describing your idea
+2. **Get feedback**: Maintainers will help scope the work
+3. **Make your changes**: Follow code style, add tests where applicable
+4. **Submit PR**: Include clear description and link to related issue
+
+**Areas needing help**:
+- 📊 Dataset generation scripts (Python)
+- 🧪 Evaluation harness for Verus verification
+- 📚 Documentation improvements
+- 🔬 Experimental ablations and benchmarks
 
 ---
 
@@ -254,14 +317,58 @@ Training is done in an instruction-style format compatible with downstream usage
 
 ### Phase 1: Evaluation
 
-The main metric is **verification pass rate** on held-out modules. Secondary metrics include:
+#### Primary Metric: Verification Pass Rate
 
-- syntax/parse correctness,
-- spec completeness and tightness,
-- size of repairs (how much the model changes), and
-- breakdown by error type (mode errors, missing ensures, wrong invariants, etc.).
+**Definition**: Percentage of generated code that successfully verifies with Verus without errors.
 
-Benchmark targets include canonical Verus data structure modules (e.g., ring buffers, lists, trees, maps, atomics) and other real-world examples.
+**Measurement**:
+- Run Verus on each generated example
+- **Pass**: Code verifies with exit code 0
+- **Fail**: Verification errors, timeouts (>30s), or syntax errors
+- **Partial success**: Track individual specs/invariants that verify (for debugging)
+
+#### Secondary Metrics
+
+| Metric | Definition | Use Case |
+|--------|------------|----------|
+| **Syntax Correctness** | % that parse as valid Rust/Verus | Filter out broken generations |
+| **Spec Completeness** | Are all necessary `requires`/`ensures` present? | Measure coverage |
+| **Spec Tightness** | Are specs neither too weak nor too strong? | Measure quality |
+| **Repair Size** | Lines changed when fixing errors (Task C) | Measure precision |
+| **Error Type Breakdown** | % of each error category (see below) | Identify weaknesses |
+
+#### Error Categories for Analysis
+
+1. **Mode errors**: Incorrect `exec`/`ghost`/`proof` usage
+2. **Missing preconditions**: Incomplete `requires` clauses
+3. **Missing postconditions**: Incomplete `ensures` clauses
+4. **Wrong invariants**: Loop invariants that don't hold
+5. **Termination**: Missing or incorrect `decreases` clauses
+6. **Type errors**: Rust type system violations
+7. **VC failures**: Verification condition failures (proof obligations)
+8. **Timeout**: Verification exceeds time limit
+
+#### Benchmark Suite
+
+**Planned test set** (to be assembled from minimized Verus code):
+
+- **Basic operations**: 20 examples (arithmetic, comparisons, simple specs)
+- **Data structures**: 30 examples (vectors, ring buffers, linked lists, trees, maps)
+- **Concurrency**: 15 examples (atomics, locks, invariants)
+- **Proof helpers**: 15 examples (lemmas, ghost code, View functions)
+- **Real-world modules**: 20 examples (from verified projects)
+
+**Total**: ~100 held-out examples across diverse categories
+
+#### Baseline Comparisons
+
+Compare fine-tuned models against:
+
+1. **Zero-shot baselines**: GPT-4, Claude, Qwen2.5-Coder (no fine-tuning)
+2. **Few-shot prompting**: With 3-5 in-context examples
+3. **VeriStruct**: Retrieval-augmented prompting baseline
+4. **Text-only SFT**: Our approach
+5. **Structure-augmented SFT**: With AST/graph encodings (Phase 2)
 
 ---
 
@@ -586,6 +693,7 @@ This repo is designed to support multiple small research projects (e.g., rotatio
 | 4 | **SFT for Proof/Invariant Repair (Task C)** | 📋 Planned | Hard | Build dataset of (broken, error) → (fixed), train repair models |
 | 5 | **Benchmark & Evaluation Harness** | 📋 Planned | Medium | Automate Verus compilation, execution, and metric collection |
 | 6 | **AST/Structure Ablation Study** | 📋 Planned | Advanced | Design AST encodings, run controlled ablations vs. text-only |
+| 7 | **Qwen Model Baseline Evaluation** | 📋 Planned | Easy-Medium | Run Qwen2.5-Coder models (0.5B, 1.5B, 7B) on Verus tasks, collect zero-shot and few-shot baselines, compare with GPT-2 prototype |
 
 ### Getting Started with a Subproject
 
@@ -593,6 +701,50 @@ This repo is designed to support multiple small research projects (e.g., rotatio
 2. **Review the current prototype** in `sft_example.py`
 3. **Read the relevant methodology section** in this README
 4. **Start small**: implement a minimal version, test it, then expand
+
+#### Spotlight: Subproject 7 - Qwen Model Baseline Evaluation
+
+**Goal**: Establish strong baseline results for code-specialized models before fine-tuning.
+
+**Why this matters**: The current prototype uses GPT-2 (a general-purpose model). We need to measure how well code-specialized models like Qwen2.5-Coder perform on Verus tasks *before* fine-tuning to quantify the value of SFT.
+
+**Deliverables**:
+1. **Inference script** for running Qwen models on Verus prompts
+2. **Zero-shot evaluation**: Raw model performance on 10-20 test examples
+3. **Few-shot evaluation**: Performance with 3-5 in-context examples
+4. **Comparison report**: Baseline metrics vs. GPT-2 (see [Evaluation](#phase-1-evaluation))
+5. **Documentation**: Best prompts, temperature settings, and failure modes
+
+**Technical steps**:
+```python
+# 1. Load Qwen model
+from transformers import AutoModelForCausalLM, AutoTokenizer
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-Coder-1.5B")
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-Coder-1.5B")
+
+# 2. Create test prompts from existing examples
+test_prompts = [...]  # From build_dataset() in sft_example.py
+
+# 3. Generate completions
+# 4. Parse outputs and run Verus verification
+# 5. Compute pass rates and error breakdowns
+```
+
+**Estimated effort**: 2-3 weeks
+- Week 1: Setup, inference script, zero-shot results
+- Week 2: Few-shot prompting experiments
+- Week 3: Verus verification, analysis, report
+
+**Prerequisites**: 
+- GPU with 8GB+ VRAM (for 1.5B model) or CPU (slower)
+- Verus installation (see [Installation](#installation))
+- Familiarity with Hugging Face transformers
+
+**Bonus extensions**:
+- Compare multiple model sizes (0.5B, 1.5B, 7B)
+- Test different prompting strategies (chain-of-thought, etc.)
+- Analyze which error types are most common
+- Create a leaderboard for tracking improvements
 
 ---
 
