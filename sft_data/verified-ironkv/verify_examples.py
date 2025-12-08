@@ -52,7 +52,7 @@ def show_example(title, source_file, func_name, source_lines_range=None):
     print(f"\n📊 PROCESSED JSON (task_a):")
     print("-" * 60)
     
-    json_path = Path(__file__).parent / "data" / "task_a_all.jsonl"
+    json_path = Path(__file__).parent / "raw" / "task_a_all.jsonl"
     with open(json_path) as f:
         for line in f:
             ex = json.loads(line)

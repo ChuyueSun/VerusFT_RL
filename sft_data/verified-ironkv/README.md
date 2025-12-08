@@ -1,138 +1,376 @@
-# VerusFT-RL Data Preparation
+# Verus SFT Dataset - IronKV
 
-This directory contains tools for preparing training data from Verus codebases.
+This directory contains a curated dataset for training models on Verus verification tasks, extracted from the IronKV codebase.
 
-## Pipeline Overview
+## Dataset Overview
 
+**Total: 514 training examples** across three verification tasks:
+
+| Task | Description | Examples | Files to Use |
+|------|-------------|----------|--------------|
+| **Task A** | Signature + Body → Specifications | 173 | `task_a_*_fixed.jsonl` |
+| **Task B** | Specifications → Implementation | 159 | `task_b_*.jsonl` |
+| **Task C** | Error + Broken Code → Fixed Code | 182 | `task_c_*_filtered.jsonl` |
+
+**Splits:**
+- Training: 410 examples (138 + 127 + 145)
+- Validation: 50 examples (17 + 15 + 18)
+- Test: 54 examples (18 + 17 + 19)
+
+## Quick Start
+
+### View the Dataset
+
+```bash
+# Browse examples interactively
+python view_dataset.py raw/task_a_train_fixed.jsonl
+python view_dataset.py raw/task_b_train.jsonl
+python view_dataset.py raw/task_c_train_filtered.jsonl
+
+# Or view in browser
+open html_reports/index.html
 ```
-┌─────────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
-│  Source Repos   │ ──▶ │  Minimizer   │ ──▶ │ Unit Extractor  │ ──▶ │ JSONL Output │
-│  (Verus code)   │     │  (optional)  │     │  (Task A/B/C)   │     │  (training)  │
-└─────────────────┘     └──────────────┘     └─────────────────┘     └──────────────┘
+
+### Edit the Dataset
+
+```bash
+# Interactive editor - browse and edit entries
+python edit_dataset.py raw/task_a_train_fixed.jsonl
+
+# Press 'e' to edit, 's' to save, 'q' to quit
 ```
+
+### Files for Training
+
+**Recommended files (use these):**
+
+```bash
+# OpenAI format
+openai_format/task_a_train_openai_fixed.jsonl       # 138 examples
+openai_format/task_b_train_openai.jsonl              # 127 examples
+openai_format/task_c_train_openai_filtered.jsonl    # 145 examples
+
+# ShareGPT format
+sharegpt_format/task_a_train_sharegpt_fixed.jsonl   # 138 examples
+sharegpt_format/task_b_train_sharegpt.jsonl          # 127 examples
+sharegpt_format/task_c_train_sharegpt_filtered.jsonl # 145 examples
+
+# Raw format (for custom pipelines)
+raw/task_a_train_fixed.jsonl                         # 138 examples
+raw/task_b_train.jsonl                               # 127 examples
+raw/task_c_train_filtered.jsonl                      # 145 examples
+```
+
+## Task Definitions
+
+### Task A: Specification Inference
+
+**Input:** Function signature + implementation body (without specs)
+**Output:** Specifications (requires, ensures, invariants, decreases)
+
+**Example:**
+```
+Input:
+  pub fn clone_option_end_point(oep: &Option<EndPoint>) -> (cloned_oep: Option<EndPoint>)
+  {
+      match oep.as_ref() {
+          Some(ep) => Some(clone_end_point(ep)),
+          None => None
+      }
+  }
+
+Output:
+  ensures match oep {
+      Some(ep) => cloned_oep.is_some() && ep@ == cloned_oep->0@,
+      None => cloned_oep is None,
+  },
+```
+
+**Files:** Use `task_a_*_fixed.jsonl` (corrected to include function body in input)
+
+### Task B: Code Generation from Specifications
+
+**Input:** Function signature + specifications
+**Output:** Verified implementation body (executable + ghost + proof code)
+
+**Example:**
+```
+Input:
+  Specifications:
+  pub fn get(&self, key: &K) -> (result: Option<&V>)
+    requires self.valid()
+    ensures match result {
+        Some(v) => self@.contains_key(*key) && self@[*key] == v@,
+        None => !self@.dom().contains(*key),
+    }
+
+Output:
+  {
+      match self.m.get(&key) {
+          Some(v) => Some(v),
+          None => None,
+      }
+  }
+```
+
+**Files:** Use original `task_b_*.jsonl` files
+
+### Task C: Error-Guided Repair
+
+**Input:** Code with verification error + error message
+**Output:** Fixed code that verifies
+
+**Example:**
+```
+Input:
+  Error: Verification failed after remove_requires
+
+  Broken Code:
+  pub fn insert(&mut self, key: K, value: V)
+  {
+      self.m.insert(key, value);
+  }
+
+Output:
+  pub fn insert(&mut self, key: K, value: V)
+    requires old(self).valid()
+    ensures self.valid(), self@ == old(self)@.insert(key, value@)
+  {
+      self.m.insert(key, value);
+  }
+```
+
+**Files:** Use `task_c_*_filtered.jsonl` (80 problematic entries removed)
 
 ## Directory Structure
 
 ```
-data_preparation/
-├── README.md                    # This file
-├── requirements.txt             # Python dependencies
-├── config.yaml                  # Configuration for data sources
+sft_data/verified-ironkv/
+├── raw/                              # Raw JSONL format
+│   ├── task_a_*_fixed.jsonl         # Task A with function bodies (USE THESE)
+│   ├── task_b_*.jsonl               # Task B (original is correct)
+│   ├── task_c_*_filtered.jsonl      # Task C filtered (USE THESE)
+│   └── *.jsonl.backup               # Automatic backups
 │
-├── collectors/                  # Source code collectors
-│   ├── __init__.py
-│   ├── github_collector.py      # Clone/fetch Verus repos
-│   └── local_collector.py       # Process local Verus files
+├── openai_format/                    # OpenAI chat format
+│   ├── task_a_*_openai_fixed.jsonl
+│   ├── task_b_*_openai.jsonl
+│   └── task_c_*_openai_filtered.jsonl
 │
-├── extractors/                  # Unit extraction logic
-│   ├── __init__.py
-│   ├── verus_parser.py          # Parse Verus syntax patterns
-│   ├── function_extractor.py    # Extract function-level units
-│   ├── spec_extractor.py        # Extract specifications
-│   └── proof_extractor.py       # Extract proof blocks
+├── sharegpt_format/                  # ShareGPT conversation format
+│   ├── task_a_*_sharegpt_fixed.jsonl
+│   ├── task_b_*_sharegpt.jsonl
+│   └── task_c_*_sharegpt_filtered.jsonl
 │
-├── tasks/                       # Task-specific generators
-│   ├── __init__.py
-│   ├── task_a_code_to_spec.py   # Code → Specifications
-│   ├── task_b_spec_to_code.py   # Specifications → Code
-│   └── task_c_error_repair.py   # Error-Guided Repair
+├── html_reports/                     # Interactive HTML viewers
+│   ├── index.html                   # Main entry point
+│   ├── task_a_report.html
+│   ├── task_b_report.html
+│   └── task_c_filtered_report.html
 │
-├── filters/                     # Quality filtering
-│   ├── __init__.py
-│   ├── deduplication.py         # Near-duplicate removal
-│   ├── quality_filter.py        # Quality scoring
-│   └── complexity_filter.py     # Complexity-based filtering
+├── text_samples/                     # Plain text samples
+│   ├── task_a_sample.txt
+│   ├── task_b_sample.txt
+│   └── task_c_filtered_sample.txt
 │
-├── output/                      # Output formatters
-│   ├── __init__.py
-│   └── jsonl_writer.py          # JSONL serialization
+├── view_dataset.py                   # Interactive viewer
+├── edit_dataset.py                   # Interactive editor
+├── check_data_quality.py             # Quality validation
+├── analyze_specific_issues.py        # Detailed analysis
+├── filter_task_c.py                  # Filter Task C duplicates
+├── fix_task_a.py                     # Fix Task A to include bodies
 │
-└── scripts/                     # Entry point scripts
-    ├── collect_sources.py       # Step 1: Collect source code
-    ├── extract_units.py         # Step 2: Extract units
-    ├── generate_tasks.py        # Step 3: Generate task data
-    └── run_pipeline.py          # Full pipeline
+├── DATA_QUALITY_REPORT.md            # Comprehensive quality analysis
+├── QUICK_SUMMARY.md                  # At-a-glance summary
+├── FIXED_DATASET_README.md           # Explanation of fixes
+├── VIEWING_GUIDE.md                  # How to view the data
+├── EDITING_GUIDE.md                  # How to edit the data
+└── README.md                         # This file
 ```
 
-## Quick Start
+## Tools
+
+### View Data
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Interactive viewer (browse with n/p/j/s/f/q)
+python view_dataset.py <jsonl_file>
 
-# Option 1: Run with command-line source path (simplest)
-python scripts/run_pipeline.py --source ../ironsht/src --output data/
+# HTML reports (open in browser)
+open html_reports/index.html
 
-# Option 2: Run with config file
-cp config.example.yaml config.yaml
-# Edit config.yaml to add your source paths under sources.local
-python scripts/run_pipeline.py --config config.yaml --output data/
+# Simple shell script
+./browse_dataset.sh <jsonl_file>
 
-# Option 3: Both config file AND additional source
-python scripts/run_pipeline.py --config config.yaml --source ./extra_source --output data/
-
-# Generate only specific tasks
-python scripts/run_pipeline.py --source ../ironsht/src --output data/ --tasks a b
-
-# Use detailed prompts
-python scripts/run_pipeline.py --source ../ironsht/src --output data/ --prompt-style detailed
-
-# Convert to popular LLM training formats
-python output/format_converters.py data/ data/openai_format/ --format openai
-python output/format_converters.py data/ data/sharegpt_format/ --format sharegpt
+# Generate new reports
+python generate_html_reports.py
+python generate_text_samples.py
 ```
 
-## Data Quality Verification
+### Edit Data
 
-See **[VERIFICATION_EXAMPLES.md](./VERIFICATION_EXAMPLES.md)** for concrete evidence that the pipeline correctly extracts Verus code. This document shows side-by-side comparisons of original source code and processed JSON output.
+```bash
+# Interactive editor (browse and edit with e/d/s/q)
+python edit_dataset.py <jsonl_file>
 
-Current quality metrics on IronSHT:
-- Task A (Code → Spec): **100%** clean
-- Task B (Spec → Code): **100%** clean  
-- Task C (Error Repair): **100%** clean
+# Automatically creates backup on first edit
+# Press 'e' to edit current entry in your text editor
+# Press 's' to save changes
+```
 
-## Task Definitions
+### Quality Checks
 
-### Task A: Code → Specifications
-- **Input**: Rust/Verus function body (specs removed or minimal)
-- **Output**: `requires`, `ensures`, `invariant`, `decreases`, Views
+```bash
+# Run comprehensive quality validation
+python check_data_quality.py
 
-### Task B: Specifications → Verified Code  
-- **Input**: Full specification + function signature
-- **Output**: Executable + ghost + proof code that verifies
+# Detailed issue analysis
+python analyze_specific_issues.py
 
-### Task C: Error-Guided Proof/Invariant Repair
-- **Input**: Code + spec + Verus error message
-- **Output**: Patched code that fixes the verification failure
+# Filter Task C duplicates
+python filter_task_c.py
 
-## Data Sources
+# Fix Task A to include function bodies
+python fix_task_a.py
+```
 
-Priority sources for Verus code:
-1. [Verus main repo](https://github.com/verus-lang/verus) - examples, tests, vstd
-2. [verified-ironkv](.) - This repo (IronSHT implementation)
-3. [VeriStruct examples](https://github.com/ChuyueSun/VeriStruct)
-4. Other projects from [Verus publications](https://verus-lang.github.io/verus/publications-and-projects/)
+## Data Quality
 
-## Output Format
+**Task A (Fixed):**
+- ✅ 173 examples with function bodies in input
+- ✅ No duplicates
+- ✅ Average complexity: 7.6
+- ⚠️ 2 examples with TODO comments (from source code)
 
-Each training example is a JSONL entry:
+**Task B (Original):**
+- ✅ 159 examples
+- ✅ No duplicates
+- ✅ Average complexity: 8.1
+- ⚠️ 16 examples with TODO comments (from source code)
+
+**Task C (Filtered):**
+- ✅ 182 clean examples (80 removed)
+- ✅ No identical broken/fixed code
+- ✅ Error types: 62% postcondition, 30% precondition, 8% invariant
+- ❌ Original had 80 entries with identical broken/fixed code (now filtered)
+
+**Overall Grade: A- (after fixes and filtering)**
+
+See [DATA_QUALITY_REPORT.md](./DATA_QUALITY_REPORT.md) for detailed analysis.
+
+## Important Notes
+
+### Task A Fixed
+
+⚠️ **The original Task A data was incorrect** - it only had function signatures without bodies, making it impossible to infer specifications.
+
+**Use the fixed versions:**
+- `task_a_*_fixed.jsonl` (includes function bodies)
+- `task_a_*_openai_fixed.jsonl`
+- `task_a_*_sharegpt_fixed.jsonl`
+
+See [FIXED_DATASET_README.md](./FIXED_DATASET_README.md) for details.
+
+### Task C Filtered
+
+⚠️ **The original Task C had 80 entries with identical broken/fixed code** - these won't teach the model anything.
+
+**Use the filtered versions:**
+- `task_c_*_filtered.jsonl` (182 clean examples)
+- `task_c_*_openai_filtered.jsonl`
+- `task_c_*_sharegpt_filtered.jsonl`
+
+## Data Formats
+
+### Raw Format
 
 ```json
 {
-  "id": "ironkv_delegation_map_v_123",
-  "task": "spec_from_code",
-  "input_text": "fn get(&self, k: &K) -> (id: ID) { ... }",
-  "target_text": "requires self.valid(),\nensures id@ == self@[*k],",
+  "id": "task_a_example_123",
+  "task": "code_to_spec",
+  "input_text": "Given the following Verus function implementation...",
+  "target_text": "ensures ...",
+  "full_function": "pub fn example() { ... }",
   "metadata": {
-    "repo": "verified-ironkv",
-    "file": "delegation_map_v.rs",
-    "function": "get",
-    "minimized": false,
-    "verus_version": "0.2024.x",
-    "has_loop_invariant": false,
-    "has_proof_block": false,
-    "spec_complexity": "medium"
+    "source_file": "../ironsht/src/example.rs",
+    "function_name": "example",
+    "function_mode": "exec",
+    "complexity_score": 5,
+    ...
   }
 }
 ```
 
+### OpenAI Format
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an expert in Verus..."
+    },
+    {
+      "role": "user",
+      "content": "Given the following Verus function implementation..."
+    },
+    {
+      "role": "assistant",
+      "content": "ensures ..."
+    }
+  ]
+}
+```
+
+### ShareGPT Format
+
+```json
+{
+  "conversations": [
+    {
+      "from": "system",
+      "value": "You are an expert in Verus..."
+    },
+    {
+      "from": "human",
+      "value": "Given the following Verus function implementation..."
+    },
+    {
+      "from": "gpt",
+      "value": "ensures ..."
+    }
+  ]
+}
+```
+
+## Training Recommendations
+
+1. **Start with Task A and B** - cleaner data with higher quality
+2. **Use filtered Task C** - avoid the 80 problematic entries
+3. **Use fixed Task A files** - includes function bodies in input
+4. **Validation sets are small** (15-18 examples) - consider combining or using more data
+
+**Total usable training data: 410 examples**
+- This is relatively small for LLM fine-tuning
+- Consider data augmentation or combining with other Verus datasets
+- May work well for instruction tuning on top of a code model
+
+## Source Attribution
+
+This dataset was extracted from the IronKV codebase:
+- Source: `../ironsht/src/`
+- All code is from verified Verus implementations
+- Functions include specifications, proofs, and ghost code
+
+## License
+
+The dataset inherits the license from the IronKV source code.
+
+## Questions?
+
+See the documentation:
+- [QUICK_SUMMARY.md](./QUICK_SUMMARY.md) - Overview and key findings
+- [DATA_QUALITY_REPORT.md](./DATA_QUALITY_REPORT.md) - Detailed quality analysis
+- [FIXED_DATASET_README.md](./FIXED_DATASET_README.md) - What was fixed and why
+- [VIEWING_GUIDE.md](./VIEWING_GUIDE.md) - How to view the data
+- [EDITING_GUIDE.md](./EDITING_GUIDE.md) - How to edit the data

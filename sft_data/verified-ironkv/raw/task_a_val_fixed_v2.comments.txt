@@ -1,0 +1,5 @@
+Entry 2 (task_a_marshal_v_deserialize_39):
+DELETED - invariant is proof, not spec
+---
+Entry 7 (task_a_hashmap_t_valid_50):
+DELETED - the code has nothing todo with the spec

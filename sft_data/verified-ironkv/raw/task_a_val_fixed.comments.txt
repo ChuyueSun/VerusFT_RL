@@ -1,0 +1,20 @@
+Entry 2 (task_a_set_lib_ext_v_lemma_flatten_sets_union_auto_157):
+DELETED - proof is ghost code, not real executable code. Input should be all executable code.
+---
+Entry 3 (task_a_delegation_map_v_range_consistent_subset_146):
+DELETED - proof
+---
+Entry 4 (task_a_set_lib_ext_v_lemma_seq_push_to_set_161):
+DELETED - proof
+---
+Entry 6 (task_a_cmessage_v_view_equal_spec_71):
+DELETED - proof
+---
+Entry 6 (task_a_delegation_map_v_to_set_114):
+DELETED - proof
+---
+Entry 7 (task_a_keys_t_cmp_107):
+input should not contain comments of requires and ensures
+---
+Entry 8 (task_a_set_lib_ext_v_map_set_finite_auto_164):
+DELETED - proof
