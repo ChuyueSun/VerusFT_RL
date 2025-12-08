@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -118,14 +119,17 @@ def verify_snippet(temp_crate: Path, timeout: int = 30) -> subprocess.CompletedP
 def attempt_extract(path: Path) -> ExtractionResult:
     text = load_file(path)
     if not contains_verus_tokens(text):
-        return ExtractionResult(path, "skipped", "no_verus_tokens")
+        return ExtractionResult(path, "skipped", "no_verus_tokens", code=text)
 
     score = score_verus_tokens(text)
     deps = extract_local_dependencies(text)
 
     temp_crate = build_temp_crate(text)
     try:
+        start_time = time.perf_counter()
         proc = verify_snippet(temp_crate)
+        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+        
         if proc.returncode == 0:
             return ExtractionResult(
                 path,
@@ -133,15 +137,18 @@ def attempt_extract(path: Path) -> ExtractionResult:
                 f"verified with score={score}",
                 code=text,
                 dependencies=deps,
+                verify_time_ms=elapsed_ms,
             )
         return ExtractionResult(
             path,
             "failed",
             proc.stderr.strip() or proc.stdout.strip(),
+            code=text,
             dependencies=deps,
+            verify_time_ms=elapsed_ms,
         )
     except subprocess.TimeoutExpired:
-        return ExtractionResult(path, "timeout", "verification_timeout", dependencies=deps)
+        return ExtractionResult(path, "timeout", "verification_timeout", code=text, dependencies=deps)
     finally:
         shutil.rmtree(temp_crate, ignore_errors=True)
 
