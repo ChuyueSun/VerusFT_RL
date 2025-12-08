@@ -1,0 +1,8 @@
+Entry 2 (task_a_io_t_get_time_61):
+code body is missing
+---
+Entry 2 (task_a_io_t_get_time_61):
+code body should not be empty
+---
+Entry 6 (task_a_main_t_sht_main_2):
+DELETED - invariant is not spec
