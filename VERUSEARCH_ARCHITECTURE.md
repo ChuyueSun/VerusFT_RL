@@ -20,7 +20,7 @@ We have a number of optimization goals that transforms turns the production and 
 - **Expert iteration**: alternate (a) search to generate successful trajectories, (b) train a model on those trajectories, repeat [R-EXIT].
 - **GRPO**: an online RL algorithm used in DeepSeek-R1 that estimates a baseline from a group of sampled outputs (no big critic model required) [R-GRPO].
 - **DPO**: an offline preference-optimization method that trains a policy using pairwise "better vs worse" samples (no on-policy RL loop required) [R-DPO].
-- **TCB (trusted computing base)**: what you must trust for "verified" to mean what you think; for Verus it includes the specs, Verus, solvers, and Rust compiler [R-VERUS-TCB].
+- **TCB (trusted computing base)**: must trust for "verified" to mean; for Verus it includes the specs, Verus, solvers, and Rust compiler [R-VERUS-TCB].
 
 ## VerusSearch's Proposed Architecture
 
@@ -50,7 +50,7 @@ We separate what to do next from how to grade it.
 - After derisking this architecture, we can eventually scale-up to DeepSeek-V3.2-Speciale.
 
 **Value model (Vψ)**: predicts the probability a given node can reach a fully verified solution soon.  
-- Not strictly required if your node scoring is strong, but often improves search efficiency.
+- Not strictly required if node scoring is strong, but often improves search efficiency.
 
 **Judge model**: checks spec non-regression, prompt alignment, and flags suspicious attempts, like writing a null Verus proof to avoid getting an error on a proof attempt. 
 
@@ -292,7 +292,7 @@ Store:
 #### Option A: GRPO / PPO-style RL (online)
 Use group sampling:
 - For each training prompt/state, sample `G` candidate patches.
-- Reward each candidate using **node score** (or terminal score if you only reward solved).
+- Reward each candidate using **node score** (or terminal score).
 - Normalize rewards within the group and update πθ.
 
 GRPO is designed to be cheaper than PPO because it avoids a large critic by using group baselines [R-GRPO]. (Hsee ugging Face TRL’s GRPO trainer for practical reference [R-TRL-GRPO].)
