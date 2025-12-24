@@ -56,7 +56,7 @@ Task generation then parsed each verified sample to extract executable functions
 
 The SQLite database (`workspace/verus_dataset.sqlite3`) contains eight tables. The core pipeline uses three: `repos` (6 rows) stores repository metadata; `samples` (1,219 rows) stores verified code snippets with foreign keys to their source repo and file; `tasks` (4,496 rows) stores the generated training examples with foreign keys to their source sample.
 
-The `source_files` table (4,309 rows) indexes all scanned Rust files before filtering. The `verify_runs` and `reduction_jobs` tables are empty—they exist for a more granular pipeline that logs individual verification commands and code minimization steps, but the bulk verification approach bypassed this. The `meta` table holds schema versioning (`schema_version: 1.0.0`).
+The `source_files` table (4,309 rows) indexes all scanned Rust files before filtering. The `verify_runs` and `reduction_jobs` tables are empty (I left them in case we can construct a more granular pipeline that logs individual verification commands and code minimization steps, but the bulk verification approach bypassed this since aggressive minimization didn't sufficiently contribute much to the dataset, see [See why minimization wasn't used](#aggressive-minimization-failure-modes)). The `meta` table holds schema versioning (`schema_version: 1.0.0`).
 
 ==The `file_id` column in `samples` is nullable because 7 samples were created programmatically during bulk imports (particularly from `vostd`) without associating them to a specific indexed source file.== The remaining 1,212 samples link back to their origin file, enabling traceability from task to sample to file to repository.
 
@@ -138,7 +138,7 @@ pub fn new(slot: &MetaSlot) -> (res: (Page<M>, Tracked<PageModel>))
 ---
 ## Distribution
 
-Samples vary significantly in complexity. The `vericoding-benchmark` contributes 929 samples averaging 62 lines—short, focused functions ideal for learning basic patterns. The `vostd` library provides 168 samples averaging 281 lines of production-grade verified systems code. The `verified-storage` samples are the most complex at 427 lines average, representing real persistent memory verification. This distribution ensures the model sees both simple learning examples and complex real-world code.
+Samples vary significantly in complexity. The `vericoding-benchmark` contributes 929 samples averaging 62 lines of short, focused functions ideal for learning basic patterns. The `vostd` library provides 168 samples averaging 281 lines of production-grade verified systems code. The `verified-storage` samples are the most complex at 427 lines average, representing real persistent memory verification. This distribution ensures the model sees both simple learning examples and complex real-world code.
 
 ---
 ## Split Strategy
@@ -148,4 +148,30 @@ The dataset is exported to JSONL with a 90/10 train/validation split (4,047 trai
 ---
 ## Training Utility
 
-Each JSONL entry contains `prompt` (model input), `target` (expected output), and `text` (concatenated for standard SFT). The `meta` field includes `function_name`, `source_repo`, and `sample_uid` for analysis and debugging. During training, the three task types can be mixed for general Verus competency, or separated for staged curriculum learning—starting with `spec_gen` (easiest, specs from code), progressing to `code_synth` (medium, code from specs), and finally `spec_and_code` (hardest, both from signature). The verified ground truth ensures that all targets actually pass Verus, providing a reliable signal for learning correct formal verification patterns.
+Each JSONL entry contains `prompt` (model input), `target` (expected output), and `text` (concatenated for standard SFT). The `meta` field includes `function_name`, `source_repo`, and `sample_uid` for analysis and debugging. During training, the three task types can be mixed for general Verus competency, or separated for staged curriculum learning, starting with `spec_gen` (easiest, specs from code), progressing to `code_synth` (medium, code from specs), and finally `spec_and_code` (hardest, both from signature). The verified ground truth ensures that all targets actually pass Verus, providing a reliable signal for learning correct formal verification patterns.
+
+---
+## Aggressive Minimization Failure Modes
+
+Tried `creduce` to minimize samples; shrinking verified code while preserving verification success, but as mentioned, for the final dataset this approach was abandoned for a few reasons:
+
+**C-Reduce produces unusable output for training data.** C-Reduce is designed to minimize bug-reproducing test cases, not to preserve meaningful code structure. When applied to a 277-line Verus sample with an interestingness test requiring verification success, C-Reduce reduced it to:
+
+```rust
+use vstd;
+```
+
+This technically "verifies" (0 functions, 0 errors) but contains no training signal. Even after modifying the interestingness test to require at least one verified function, C-Reduce produced malformed code:
+
+```rust
+fn d(a: Vec<int>) -> Vec<int> requires { Vec::new() }
+fn f(a: Vec<int>, limit: usize, x: int) -> usize requires { let mut g= 0; ... }
+```
+
+The specs are empty or garbled, formatting is destroyed, and function names are reduced to single letters, defeating the purpose of the training data.
+
+**Most samples cannot verify standalone.** The `vostd` and `verified-storage` samples use internal imports (`use crate::...`, `use super::...`) and require their full crate build context. Standalone Verus invocation fails immediately. Only `vericoding-benchmark` samples (which are already minimal at 62 lines average) can verify independently.
+
+**Function-level extraction was also attempted.** As a fallback, individual functions with specs were extracted from `verus-lang-verus` examples into standalone files. This produced 41 new samples, but many were duplicates or trivial (e.g., `proof fn check_eq(x: Seq<int>, y: Seq<int>) requires x == y {}`). The net gain was ~50 tasks (~1% increase), which was not worth the complexity.
+
+**The existing task generation is already "minimized" in the right sense.** Each task extracts a single function from a sample and presents it with focused prompt/target pairs. The model sees the function in isolation, which is the granularity that matters for learning, so sample-level minimization would only remove surrounding context that the task generation already filters out.
