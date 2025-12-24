@@ -1,4 +1,4 @@
-Training dataset for Verus formal verification tasks, containing **4,496 tasks** generated from verified Rust code with formal specifications.
+**4,496 tasks** generated from verified Rust code with formal specifications.
 
 **Location:** `workspace/verus_dataset.sqlite3`
 **Exports:** `workspace/exports/*.jsonl`
