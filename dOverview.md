@@ -154,24 +154,15 @@ Each JSONL entry contains `prompt` (model input), `target` (expected output), an
 ## Aggressive Minimization Failure Modes
 
 Tried `creduce` to minimize samples; shrinking verified code while preserving verification success, but as mentioned, for the final dataset this approach was abandoned for a few reasons:
+- **C-Reduce produces unusable output for training data.** C-Reduce is designed to minimize bug-reproducing test cases, not to preserve meaningful code structure. When applied to a 277-line Verus sample with an interestingness test requiring verification success, C-Reduce reduced it to `use vstd;`. This technically "verifies" (0 functions, 0 errors) but contains no training signal. Even after modifying the interestingness test to require at least one verified function, C-Reduce produced malformed code:
+  ```rust
 
-**C-Reduce produces unusable output for training data.** C-Reduce is designed to minimize bug-reproducing test cases, not to preserve meaningful code structure. When applied to a 277-line Verus sample with an interestingness test requiring verification success, C-Reduce reduced it to:
+  fn d(a: Vec<int>) -> Vec<int> requires { Vec::new() }
 
-```rust
-use vstd;
-```
+  fn f(a: Vec<int>, limit: usize, x: int) -> usize requires { let mut g= 0; ... }
 
-This technically "verifies" (0 functions, 0 errors) but contains no training signal. Even after modifying the interestingness test to require at least one verified function, C-Reduce produced malformed code:
-
-```rust
-fn d(a: Vec<int>) -> Vec<int> requires { Vec::new() }
-fn f(a: Vec<int>, limit: usize, x: int) -> usize requires { let mut g= 0; ... }
-```
-
-The specs are empty or garbled, formatting is destroyed, and function names are reduced to single letters, defeating the purpose of the training data.
-
-**Most samples cannot verify standalone.** The `vostd` and `verified-storage` samples use internal imports (`use crate::...`, `use super::...`) and require their full crate build context. Standalone Verus invocation fails immediately. Only `vericoding-benchmark` samples (which are already minimal at 62 lines average) can verify independently.
-
-**Function-level extraction was also attempted.** As a fallback, individual functions with specs were extracted from `verus-lang-verus` examples into standalone files. This produced 41 new samples, but many were duplicates or trivial (e.g., `proof fn check_eq(x: Seq<int>, y: Seq<int>) requires x == y {}`). The net gain was ~50 tasks (~1% increase), which was not worth the complexity.
-
-**The existing task generation is already "minimized" in the right sense.** Each task extracts a single function from a sample and presents it with focused prompt/target pairs. The model sees the function in isolation, which is the granularity that matters for learning, so sample-level minimization would only remove surrounding context that the task generation already filters out.
+  ```
+  The specs are empty or garbled, formatting is destroyed, and function names are reduced to single letters, defeating the purpose of the training data.
+- **Most samples cannot verify standalone.** The `vostd` and `verified-storage` samples use internal imports (`use crate::...`, `use super::...`) and require their full crate build context. Standalone Verus invocation fails immediately. Only `vericoding-benchmark` samples (which are already minimal at 62 lines average) can verify independently.
+- **Function-level extraction was also attempted.** As a fallback, individual functions with specs were extracted from `verus-lang-verus` examples into standalone files. This produced 41 new samples, but many were duplicates or trivial (e.g., `proof fn check_eq(x: Seq<int>, y: Seq<int>) requires x == y {}`). The net gain was ~50 tasks (~1% increase), which was not worth the complexity.
+- **The existing task generation is already "minimized" in the right sense.** Each task extracts a single function from a sample and presents it with focused prompt/target pairs. The model sees the function in isolation, which is the granularity that matters for learning, so sample-level minimization would only remove surrounding context that the task generation already filters out.
