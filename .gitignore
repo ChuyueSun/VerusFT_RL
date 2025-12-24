@@ -50,3 +50,9 @@ Thumbs.db
 .cache/
 *.cache
 
+# Workspace - ignore reproducible/large files, keep dataset
+workspace/repos/
+workspace/verus-*/
+workspace/verus-release.zip
+workspace/work/
+workspace/*.bak
