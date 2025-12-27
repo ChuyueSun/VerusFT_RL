@@ -23,6 +23,10 @@ wheels/
 .installed.cfg
 *.egg
 
+# Rust build artifacts
+**/target/
+Cargo.lock
+
 # Training outputs
 sft_output/
 checkpoint-*/
@@ -49,4 +53,46 @@ Thumbs.db
 # Cache
 .cache/
 *.cache
+
+# ===========================================
+# Workspace - Intermediate/Large Files
+# ===========================================
+
+# Source repositories (should be cloned separately)
+workspace/repos/
+
+# Verus binary (should be downloaded separately)
+workspace/verus-arm64-macos/
+
+# SQLite database (intermediate)
+workspace/*.sqlite3
+
+# Large intermediate extraction files
+workspace/*_extracted*.jsonl
+workspace/test_extracted*.jsonl
+
+# Intermediate dataset directories
+workspace/dataset_file_level/
+workspace/dataset_function_level/
+workspace/function_extracted_dataset/
+workspace/function_extracted_dataset_v2/
+workspace/verified_dataset_standalone/
+workspace/inlined_crates/
+workspace/minimized_*/
+workspace/complex_repos/
+workspace/work/
+
+# Empty/temp files
+workspace/ast_*.jsonl
+
+# Old documentation (superseded by unified_dataset/README.md)
+workspace/DATASET_METHODOLOGY.md
+workspace/DATASET_README.md
+
+# Utility scripts (not part of main pipeline)
+workspace/*.py
+
+# Dataset generation scripts (depend on gitignored intermediate files)
+create_final_dataset.py
+verus_minimizer_extraction.py
 
