@@ -5,30 +5,30 @@
     "test": 0.1
   },
   "random_seed": 42,
-  "total_entries": 9674,
+  "total_entries": 14659,
   "combined": {
-    "train": 7738,
-    "val": 967,
-    "test": 969
+    "train": 11725,
+    "val": 1466,
+    "test": 1468
   },
   "by_task": {
     "task_a": {
-      "total": 2053,
-      "train": 1642,
-      "val": 205,
-      "test": 206
+      "total": 3677,
+      "train": 2941,
+      "val": 368,
+      "test": 368
     },
     "task_b": {
-      "total": 2028,
-      "train": 1622,
-      "val": 203,
-      "test": 203
+      "total": 3251,
+      "train": 2600,
+      "val": 325,
+      "test": 326
     },
     "task_c": {
-      "total": 5593,
-      "train": 4474,
-      "val": 559,
-      "test": 560
+      "total": 7731,
+      "train": 6184,
+      "val": 773,
+      "test": 774
     }
   }
 }

@@ -1,25 +1,26 @@
 # Verus Formal Verification Dataset
 
-Training dataset for Verus formal verification tasks, containing **9,674 entries** across three task types designed to teach models specification generation, verified code synthesis, and proof repair.
+Training dataset for Verus formal verification tasks, containing **14,659 entries** across three task types designed to teach models specification generation, verified code synthesis, and proof repair.
 
 **Location:** `workspace/min_dataset/`
 ```
 min_dataset/
-├── dataset.jsonl              # Complete dataset (9,674 entries)
+├── dataset.jsonl              # Complete dataset (14,659 entries)
+├── dataset.sqlite3            # SQLite database for queries (this is just for easier querying of the dataset, like through `Harlequin`)
 ├── stats.json                 # Dataset statistics
 └── splits/
-    ├── train.jsonl            # Combined train (7,738 entries, 80%)
-    ├── val.jsonl              # Combined val (967 entries, 10%)
-    ├── test.jsonl             # Combined test (969 entries, 10%)
-    ├── task_a_train.jsonl     # Task A train (1,642)
-    ├── task_a_val.jsonl       # Task A val (205)
-    ├── task_a_test.jsonl      # Task A test (206)
-    ├── task_b_train.jsonl     # Task B train (1,622)
-    ├── task_b_val.jsonl       # Task B val (203)
-    ├── task_b_test.jsonl      # Task B test (203)
-    ├── task_c_train.jsonl     # Task C train (4,474)
-    ├── task_c_val.jsonl       # Task C val (559)
-    ├── task_c_test.jsonl      # Task C test (560)
+    ├── train.jsonl            # Combined train (11,725 entries, 80%)
+    ├── val.jsonl              # Combined val (1,466 entries, 10%)
+    ├── test.jsonl             # Combined test (1,468 entries, 10%)
+    ├── task_a_train.jsonl     # Task A train (2,941)
+    ├── task_a_val.jsonl       # Task A val (368)
+    ├── task_a_test.jsonl      # Task A test (368)
+    ├── task_b_train.jsonl     # Task B train (2,600)
+    ├── task_b_val.jsonl       # Task B val (325)
+    ├── task_b_test.jsonl      # Task B test (326)
+    ├── task_c_train.jsonl     # Task C train (6,184)
+    ├── task_c_val.jsonl       # Task C val (773)
+    ├── task_c_test.jsonl      # Task C test (774)
     └── metadata.json          # Split metadata
 ```
 
@@ -54,9 +55,9 @@ task_c_train = [e for e in train_data if e["task"] == "task_c"]
 ---
 ## Construction
 
-The dataset was constructed by extracting verified functions from multiple Verus repositories and generating training tasks through AST-based transformations. Two extraction pipelines were developed: a high-yield pipeline for the `vericoding-benchmark` (2,055 self-contained samples) and a minimizer-driven pipeline for complex multi-file repositories.
+The dataset was constructed by extracting verified functions from multiple Verus sources and generating training tasks through AST-based transformations. Three extraction pipelines were developed: a high-yield pipeline for `vericoding-benchmark` (9,079 self-contained samples), a Coq→Verus translation pipeline for Software Foundations proofs (4,985 samples from 222 verified files), and a minimizer-driven pipeline for complex multi-file repositories (595 samples).
 
-Source repositories include `vericoding-benchmark` (LLM-generated solutions to verification problems), `autoverus` (automatically verified code), and nine complex repositories: `verus-lang/verus` (official examples), `vostd` (verified OS standard library), `verified-ironkv` (distributed key-value store), `verismo` (confidential VM monitor), `verified-storage` (persistent memory), `verified-memory-allocator`, `leaf` (verified paging), `verified-node-replication`, and `verified-nrkernel`. ==The vericoding-benchmark dominates the dataset at ~95% of entries because its samples are self-contained single-file functions that verify standalone, while complex repositories required expensive per-function minimization with low success rates (174 samples from 1,115 files, ~16%).==
+Source repositories include `vericoding-benchmark` (LLM-generated solutions to verification problems), `coq-translation` (Software Foundations Coq proofs translated to Verus, covering boolean logic, lists, Hoare logic, induction principles, and verified data structures), and nine complex repositories: `verus-lang/verus` (official examples), `vostd` (verified OS standard library), `verified-ironkv` (distributed key-value store), `verismo` (confidential VM monitor), `verified-storage` (persistent memory), `verified-memory-allocator`, `verified-node-replication`, and `verified-nrkernel`. ==The vericoding-benchmark provides ~62% of entries as self-contained exec functions, coq-translation adds ~34% as spec/proof functions, while complex repositories contribute ~4% due to expensive per-function minimization with low success rates.==
 
 Verification was performed using a pre-built Verus binary (`verus-arm64-macos`) to ensure consistent results. Each extracted function was verified in isolation before inclusion. Functions containing `assume(false)`, `unimplemented!()`, or other verification shortcuts were excluded to ensure all training targets represent genuine verified code.
 
@@ -87,7 +88,7 @@ impl<'ast> Visit<'ast> for AnnotationExtractor {
 ---
 ## Task Types
 
-### Task A: Code → Specs (2,053 entries)
+### Task A: Code → Specs (3,677 entries)
 
 The model receives a complete function implementation with all proof annotations stripped and must generate the full specification. This teaches inferring preconditions, postconditions, loop invariants, and termination measures from code behavior.
 
@@ -114,7 +115,7 @@ invariant 0 <= i <= a.len(),
 
 The input is generated by stripping all `requires`, `ensures`, `invariant`, `decreases`, and `assert` constructs from the verified code. ==49.3% of Task A entries include loop invariants in the target, and 46.6% include decreases clauses==, ensuring the model learns these harder annotation types.
 
-### Task B: Specs → Code (2,028 entries)
+### Task B: Specs → Code (3,251 entries)
 
 The model receives a function signature with function-level specifications but no implementation and must synthesize code that satisfies the spec. This teaches verified code generation from formal specifications.
 
@@ -144,7 +145,7 @@ fn zap_negatives(a: &mut Vec<i32>)
 
 ==Critically, Task B inputs exclude loop invariants and decreases clauses.== These reference implementation variables that only exist inside the function body. Including them would give the model "hints" about the implementation structure (loop variable names, bounds expressions) that shouldn't be available when synthesizing from specs alone.
 
-### Task C: Repair (5,593 entries)
+### Task C: Repair (7,731 entries)
 
 The model receives buggy code with one proof annotation removed and must identify and restore the missing annotation. This teaches debugging verification failures—a common task when working with formal verification tools.
 
@@ -169,10 +170,10 @@ Task C is generated by programmatically removing one annotation type from verifi
 
 | Bug Type | Count | Description |
 |----------|-------|-------------|
-| `missing_ensures` | 1,909 | Postcondition removed |
-| `missing_requires` | 1,438 | Precondition removed |
+| `missing_ensures` | 3,130 | Postcondition removed |
+| `missing_requires` | 1,812 | Precondition removed |
+| `missing_decreases` | 1,506 | Termination measure removed |
 | `missing_invariant` | 1,010 | Loop invariant removed |
-| `missing_decreases` | 963 | Termination measure removed |
 | `missing_assert` | 273 | Proof assertion removed |
 
 ---
@@ -220,14 +221,15 @@ Repositories like `vostd` and `verismo` require their full build context (`cargo
 ---
 ## Distribution
 
-The dataset is heavily weighted toward vericoding-benchmark samples due to their standalone verifiability:
+The dataset draws from three source categories:
 
-| Source | Samples | % of Total |
-|--------|---------|------------|
-| vericoding-benchmark | ~1,950 | ~95% |
-| Complex repos (verus, vostd, etc.) | ~100 | ~5% |
+| Source | Samples | % of Total | Description |
+|--------|---------|------------|-------------|
+| vericoding_ast | 9,079 | 62% | LLM-generated exec functions |
+| coq_translation | 4,985 | 34% | Software Foundations spec/proof functions |
+| complex_repos (verus, vostd, etc.) | 595 | 4% | Real Verus projects |
 
-Within Task C, the distribution reflects annotation frequency in verified code: `ensures` clauses are most common (1,909), followed by `requires` (1,438), then loop constructs (`invariant`: 1,010, `decreases`: 963), with `assert` statements least common (273).
+Within Task C, the distribution reflects annotation frequency: `ensures` clauses are most common (3,130), followed by `requires` (1,812), `decreases` (1,506), `invariant` (1,010), with `assert` statements least common (273).
 
 ---
 ## Split Strategy
@@ -236,10 +238,10 @@ The dataset is split 80/10/10 (train/val/test) with a fixed random seed (42) for
 
 | Task | Train | Val | Test | Total |
 |------|-------|-----|------|-------|
-| Task A | 1,642 | 205 | 206 | 2,053 |
-| Task B | 1,622 | 203 | 203 | 2,028 |
-| Task C | 4,474 | 559 | 560 | 5,593 |
-| **Combined** | **7,738** | **967** | **969** | **9,674** |
+| Task A | 2,941 | 368 | 368 | 3,677 |
+| Task B | 2,600 | 325 | 326 | 3,251 |
+| Task C | 6,184 | 773 | 774 | 7,731 |
+| **Combined** | **11,725** | **1,466** | **1,468** | **14,659** |
 
 Both combined splits (all tasks mixed) and task-specific splits are provided. Use combined for general Verus competency training, or task-specific for curriculum learning or specialized fine-tuning.
 

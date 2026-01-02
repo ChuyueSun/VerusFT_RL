@@ -1,21 +1,20 @@
 {
   "task_counts": {
-    "task_a": 2053,
-    "task_b": 2028,
-    "task_c": 5593
+    "task_a": 3677,
+    "task_b": 3251,
+    "task_c": 7731
   },
   "bug_type_counts": {
-    "missing_ensures": 1909,
-    "missing_requires": 1438,
     "missing_assert": 273,
+    "missing_decreases": 1506,
+    "missing_ensures": 3130,
     "missing_invariant": 1010,
-    "missing_decreases": 963
+    "missing_requires": 1812
   },
-  "proof_coverage": {
-    "with_invariants": 1012,
-    "with_decreases": 957,
-    "invariant_pct": 49.3,
-    "decreases_pct": 46.6
+  "source_counts": {
+    "vericoding_ast": 9079,
+    "coq_translation": 4985,
+    "complex_repos": 595
   },
-  "total_entries": 9674
+  "total_entries": 14659
 }
