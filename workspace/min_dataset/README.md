@@ -85,6 +85,25 @@ impl<'ast> Visit<'ast> for AnnotationExtractor {
 
 ==The AST-based approach was critical for Task B correctness.== Early regex-based extraction leaked loop invariants into Task B inputs, which reference implementation variables (`idx`, `sum`, `max_val`) that don't exist in the function signature. The model would see specs mentioning undefined variables, making the task unsolvable. AST extraction cleanly separates function-level specs (safe to show) from loop-level specs (must hide).
 
+### Function Mode Support
+
+By default, the extractor targets **exec functions** only (executable Verus code that compiles to Rust). For datasets like `coq-translation` (Software Foundations proofs), which primarily contain spec and proof functions, the `--include-spec-proof` flag enables extraction of all function modes:
+
+```bash
+# Default: exec functions only
+./verus_extractor -i repo/ -o output.jsonl --mode repo
+
+# Include spec and proof functions
+./verus_extractor -i repo/ -o output.jsonl --mode repo --include-spec-proof
+```
+
+The extractor distinguishes function modes via the `FnMode` AST node:
+- `FnMode::Exec` / `FnMode::Default` → exec functions (always extracted)
+- `FnMode::Spec` / `FnMode::SpecChecked` → spec functions (extracted with `--include-spec-proof`)
+- `FnMode::Proof` / `FnMode::ProofAxiom` → proof functions (extracted with `--include-spec-proof`)
+
+This distinction is important because spec/proof functions have different verification semantics than exec functions as they exist only at verification time and are erased during compilation.
+
 ---
 ## Task Types
 
@@ -147,7 +166,7 @@ fn zap_negatives(a: &mut Vec<i32>)
 
 ### Task C: Repair (7,731 entries)
 
-The model receives buggy code with one proof annotation removed and must identify and restore the missing annotation. This teaches debugging verification failures—a common task when working with formal verification tools.
+The model receives buggy code with one proof annotation removed and must identify and restore the missing annotation. This teaches debugging verification failures, which is a common task when working with FV.
 
 ```rust
 // INPUT: code missing an invariant (verification fails)
@@ -248,7 +267,7 @@ Both combined splits (all tasks mixed) and task-specific splits are provided. Us
 ---
 ## Training Recommendations
 
-**Curriculum approach:** Start with Task A (easiest—inferring specs from visible code), progress to Task C (medium—identifying missing annotations), finish with Task B (hardest—synthesizing code from specs alone).
+**Curriculum approach:** Start with Task A (easiest, inferring specs from visible code), progress to Task C (medium, identifying missing annotations), finish with Task B (hardest, synthesizing code from specs alone).
 
 **Task mixing:** For general Verus competency, train on combined splits. The task type is encoded in each entry's `task` field, allowing the model to learn task-specific patterns.
 

@@ -34,6 +34,9 @@ struct Args {
     task_output: bool,
     #[arg(long)]
     task_file: Option<String>,
+    /// Include spec and proof functions (not just exec functions)
+    #[arg(long)]
+    include_spec_proof: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -128,6 +131,8 @@ struct GlobalRegistry {
     use_statements: HashSet<String>,
     current_module: Vec<String>,
     current_file: PathBuf,
+    /// If true, also extract spec and proof functions (not just exec)
+    include_spec_proof: bool,
 }
 
 impl GlobalRegistry {
@@ -215,7 +220,14 @@ impl<'ast> Visit<'ast> for ItemCollectorVisitor<'_> {
             references: refs.clone(),
         });
 
-        if kind == ItemKind::ExecFn {
+        // Determine if this function should be a target
+        let should_extract = match kind {
+            ItemKind::ExecFn => true,
+            ItemKind::SpecFn | ItemKind::ProofFn => self.registry.include_spec_proof,
+            _ => false,
+        };
+
+        if should_extract {
             let specs = extract_specs_from_sig(&node.sig);
             if !specs.is_empty() {
                 self.registry.targets.push(TargetFunction {
@@ -853,8 +865,8 @@ fn parse_file_into_registry(path: &Path, registry: &mut GlobalRegistry) -> bool 
     true
 }
 
-fn process_repo(repo_dir: &Path, verus_path: Option<&str>, skip_verify: bool, output_file: &mut fs::File, mut task_file: Option<&mut fs::File>) -> io::Result<(usize, usize, usize)> {
-    let mut registry = GlobalRegistry::default();
+fn process_repo(repo_dir: &Path, verus_path: Option<&str>, skip_verify: bool, include_spec_proof: bool, output_file: &mut fs::File, mut task_file: Option<&mut fs::File>) -> io::Result<(usize, usize, usize)> {
+    let mut registry = GlobalRegistry { include_spec_proof, ..Default::default() };
     eprintln!("Phase 1: Building global registry...");
 
     let files = find_verus_files(repo_dir);
@@ -910,7 +922,7 @@ fn process_repo(repo_dir: &Path, verus_path: Option<&str>, skip_verify: bool, ou
     Ok((extracted, verified, tasks))
 }
 
-fn process_jsonl(input_path: &str, verus_path: Option<&str>, skip_verify: bool, output_file: &mut fs::File, mut task_file: Option<&mut fs::File>) -> io::Result<(usize, usize, usize)> {
+fn process_jsonl(input_path: &str, verus_path: Option<&str>, skip_verify: bool, include_spec_proof: bool, output_file: &mut fs::File, mut task_file: Option<&mut fs::File>) -> io::Result<(usize, usize, usize)> {
     let reader = io::BufReader::new(fs::File::open(input_path)?);
     let (mut total, mut verified, mut tasks) = (0, 0, 0);
 
@@ -919,7 +931,7 @@ fn process_jsonl(input_path: &str, verus_path: Option<&str>, skip_verify: bool, 
         if line.trim().is_empty() { continue; }
         let sample: InputSample = match serde_json::from_str(&line) { Ok(s) => s, Err(_) => continue };
 
-        let mut registry = GlobalRegistry::default();
+        let mut registry = GlobalRegistry { include_spec_proof, ..Default::default() };
         registry.current_file = PathBuf::from(&sample.source_file);
         let file = match verus_syn::parse_file(&sample.full_code) { Ok(f) => f, Err(_) => continue };
 
@@ -979,9 +991,9 @@ fn main() -> io::Result<()> {
     } else { None };
 
     let (total, verified, tasks) = if args.mode == "repo" {
-        process_repo(Path::new(&args.input), args.verus_path.as_deref(), args.skip_verify, &mut output_file, task_file.as_mut())?
+        process_repo(Path::new(&args.input), args.verus_path.as_deref(), args.skip_verify, args.include_spec_proof, &mut output_file, task_file.as_mut())?
     } else {
-        process_jsonl(&args.input, args.verus_path.as_deref(), args.skip_verify, &mut output_file, task_file.as_mut())?
+        process_jsonl(&args.input, args.verus_path.as_deref(), args.skip_verify, args.include_spec_proof, &mut output_file, task_file.as_mut())?
     };
 
     eprintln!("\n=== COMPLETE ===\nTotal: {}\nVerified: {} ({:.1}%)", total, verified, 100.0 * verified as f64 / total.max(1) as f64);
