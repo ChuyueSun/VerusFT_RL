@@ -1,0 +1,20 @@
+{
+  "task_counts": {
+    "task_a": 3677,
+    "task_b": 3251,
+    "task_c": 7731
+  },
+  "bug_type_counts": {
+    "missing_assert": 273,
+    "missing_decreases": 1506,
+    "missing_ensures": 3130,
+    "missing_invariant": 1010,
+    "missing_requires": 1812
+  },
+  "source_counts": {
+    "vericoding_ast": 9079,
+    "coq_translation": 4985,
+    "complex_repos": 595
+  },
+  "total_entries": 14659
+}

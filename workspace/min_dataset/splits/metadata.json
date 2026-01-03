@@ -1,0 +1,34 @@
+{
+  "split_ratios": {
+    "train": 0.8,
+    "val": 0.1,
+    "test": 0.1
+  },
+  "random_seed": 42,
+  "total_entries": 14659,
+  "combined": {
+    "train": 11725,
+    "val": 1466,
+    "test": 1468
+  },
+  "by_task": {
+    "task_a": {
+      "total": 3677,
+      "train": 2941,
+      "val": 368,
+      "test": 368
+    },
+    "task_b": {
+      "total": 3251,
+      "train": 2600,
+      "val": 325,
+      "test": 326
+    },
+    "task_c": {
+      "total": 7731,
+      "train": 6184,
+      "val": 773,
+      "test": 774
+    }
+  }
+}
