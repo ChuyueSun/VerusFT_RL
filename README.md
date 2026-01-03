@@ -41,7 +41,7 @@ We currently construct samples from four complementary sources:
 
 We will post-train large code models starting with:
 
-- Qwen3-Coder-70B
+- Qwen2.5-72B
 - Qwen3-Coder-480B
 
 Before any post-training, we evaluate baseline performance on both open-source and closed models (where available). This ensures improvements can be attributed to data and training rather than evaluation artifacts.
